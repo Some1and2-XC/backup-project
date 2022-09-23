@@ -10,7 +10,7 @@ Backs up Files with the *.88 format
 import json
 from shutil import copy2 as cp
 
-def create88():
+def create88(SourcePath: str = None, ReferencePath: str = None):
     """Main function of program
 
     # Notes
@@ -147,9 +147,6 @@ def create88():
 
         return 1
 
-    SourcePath = "C:\\Users\\User\\Desktop\\.py\\Fractals\\Kyros"
-    ReferencePath = "C:\\Users\\User\\Desktop\\.py\\Backup Proj\\BACKUP\\BKF"
-
     chdir(SourcePath)
 
     ListEntry = namedtuple("FilePaths", "filename path")
@@ -160,7 +157,7 @@ def create88():
 
     print("\n\n\tBackup Completed!\n")
 
-def regen88():
+def regen88(ReferencePath: str = None):
     """Function for regenerating an 88
 
     Keyword arguments:
@@ -184,8 +181,12 @@ def regen88():
         RecursFolderGen(path[1::])
         return True
 
+    if ReferencePath: chdir(ReferencePath)
+
     BaseBase = getcwd()
-    BaseFolder = "FD"
+    BaseFolder = "RESTOREDBACKUP"
+
+    print("Starting Restore", end = "\r")
 
     with open(OutFileName + ext, "r") as file:
         data = json.loads(file.read())
@@ -197,11 +198,9 @@ def regen88():
             chdir(BaseBase)
             cp(key + ext, f"{BaseFolder}\\{file}")
 
+    print("Finished Restore")
+
 OutputNumber = 0 # Number that gets printed on Command Initialisation
 
 ext = ".88"
-OutFileName = "..reconstruction"
-
-if __name__ == "__main__":
-    create88()
-    regen88()
+OutFileName = ".reconstruct"
