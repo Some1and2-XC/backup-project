@@ -10,6 +10,37 @@ Backs up Files with the *.88 format
 import json
 from shutil import copy2 as cp
 
+def StoreSearch88():
+    """Function for searching for Storage Devices
+    Searches for devices with a @source.88 & @reference.88
+
+    Requires installation of wmi
+    Will Move Directories if used
+    Reference: https://stackoverflow.com/a/61168723
+    """
+
+    from wmi import WMI
+    from os import chdir
+    from glob import glob
+    from re import findall as match
+
+    FoundPaths = {}
+    for drive in WMI().Win32_LogicalDisk():
+        chdir(f"{drive.Caption}\\")
+        directory = glob("*.88")
+        if "@reference.88" in directory:
+            with open("@reference.88", "r") as file:
+                FoundPaths["Reference"] = f"{drive.Caption}\\" + match(r"(?<=@).*(?=@)", file.read())[0]
+                file.close()
+        if "@source.88" in directory:
+            FoundPaths["Source"] = f"{drive.Caption}\\"
+    try:
+        return (FoundPaths["Source"], FoundPaths["Reference"])
+    except KeyError: return False
+    except Exception as e:
+        print("Unknown Error")
+        return False
+
 def create88(SourcePath: str = None, ReferencePath: str = None):
     """Main function of program
 
@@ -32,6 +63,8 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
         Keyword arguments:
         OutputStr -- String printed on output (default None)
         """
+        global OutputNumber
+        OutputNumber = 0 # Number that gets printed on Command Initialisation
         if not isinstance(OutputStr, str):
             raise TypeError(f"Output Must be `str`, not {type(OutputStr)}")
 
@@ -39,10 +72,10 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             @wraps(func)
             def InnerWrapper(*args, **kwargs):
                 global OutputNumber
-                print(f"Process [{OutputNumber}] | {OutputStr}" + " " * 15, end="\r")
-                t = func(*args, **kwargs)
+                print(f"Process [{OutputNumber}] | {OutputStr}" + " " * 15)
+                # print(f"Process [{OutputNumber}] | {OutputStr}" + " " * 15, end="\r")
                 OutputNumber += 1
-                return t
+                return func(*args, **kwargs)
             return InnerWrapper
         return OuterWrapper
 
@@ -62,9 +95,9 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             NewFiles = []
             for subfolder in glob("*/"):
                 try:
-                    subfolder = findall(r"[a-zA-Z0-9_.& \-\\\,\{\}\+\(\)\-\[\]]+(?=\\)", subfolder)[0]
-                    NewFiles = [*NewFiles, *DirectoryCarve(dir = [*dir, subfolder])]
-                    subfolders.add(subfolder)
+                    LocalSubfolder = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+(?=\\)", subfolder)[0]
+                    NewFiles = [*NewFiles, *DirectoryCarve(dir = [*dir, LocalSubfolder])]
+                    subfolders.add(LocalSubfolder)
                 except Exception as e:
                     print(f"Error on {subfolder}{dir} | {e}")
             files = set(glob("*")) - subfolders
@@ -137,9 +170,12 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             rm(file)
 
         for file in TreeDict:
-            Source = TreeDict[file][0]
-            Destination = file + ext
-            cp(f"{BasePath}\\{Source}", Destination)
+            try:
+                Source = TreeDict[file][0]
+                Destination = file + ext
+                cp(f"{BasePath}\\{Source}", Destination)
+            except Exception as e:
+                print(f"\nError: {e}")
 
         with open(OutFileName + ext, "w") as f:
             f.write(json.dumps(TreeDict, sort_keys = True))
@@ -155,7 +191,7 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
     TreeDict = MakeDictWithHashKey(ProjTree)
     assert XReferenceAndCopy(TreeDict)
 
-    print("\n\n\tBackup Completed!\n")
+    print("\n\tBackup Completed!\n")
 
 def regen88(ReferencePath: str = None):
     """Function for regenerating an 88
@@ -200,7 +236,5 @@ def regen88(ReferencePath: str = None):
 
     print("Finished Restore")
 
-OutputNumber = 0 # Number that gets printed on Command Initialisation
-
-ext = ".88"
-OutFileName = ".reconstruct"
+ext = ".88" # Extention for the filename
+OutFileName = "@reconstruct" # The Filename of the reconstruction file
