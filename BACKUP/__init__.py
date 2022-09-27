@@ -9,6 +9,8 @@ Backs up Files with the *.88 format
 
 import json
 from shutil import copy2 as cp
+from os import path
+from os import sep as PathSep
 
 def StoreSearch88():
     """Function for searching for Storage Devices
@@ -26,14 +28,14 @@ def StoreSearch88():
 
     FoundPaths = {}
     for drive in WMI().Win32_LogicalDisk():
-        chdir(f"{drive.Caption}\\")
+        chdir(drive.Caption)
         directory = glob("*.88")
         if "@reference.88" in directory:
             with open("@reference.88", "r") as file:
-                FoundPaths["Reference"] = f"{drive.Caption}\\" + match(r"(?<=@).*(?=@)", file.read())[0]
+                FoundPaths["Reference"] = path.join(drive.Caption, match(r"(?<=@).*(?=@)", file.read())[0])
                 file.close()
         if "@source.88" in directory:
-            FoundPaths["Source"] = f"{drive.Caption}\\"
+            FoundPaths["Source"] = drive.Caption
     try:
         return (FoundPaths["Source"], FoundPaths["Reference"])
     except KeyError: return False
@@ -95,13 +97,13 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             NewFiles = []
             for subfolder in glob("*/"):
                 try:
-                    LocalSubfolder = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+(?=\\)", subfolder)[0]
+                    LocalSubfolder = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+(?=\\)" , subfolder)[0]
                     NewFiles = [*NewFiles, *DirectoryCarve(dir = [*dir, LocalSubfolder])]
                     subfolders.add(LocalSubfolder)
                 except Exception as e:
                     print(f"Error on {subfolder}{dir} | {e}")
             files = set(glob("*")) - subfolders
-            dir = "\\".join(dir)
+            dir = PathSep.join(dir)
             chdir("..")
             return [
                 *NewFiles,
@@ -114,7 +116,7 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
 
         return DirectoryCarve()
 
-    @WOutput("Converting Data Format")
+    @WOutput("SHA1 of All Files")
     def MakeDictWithHashKey(SearchData):
         """Function for making every entry returned from `RecursiveSearch()` to dict with sha hash
         returns dict with file paths stored in list under dictionary with hash of the files as keys
@@ -137,18 +139,24 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             return h.hexdigest()
 
         entries = {}
-        for entry in SearchData:
+
+        SearchDataAmnt = len(SearchData)
+
+        for i in range(SearchDataAmnt):
+            entry = SearchData[i]
+            print(f" - Hash : [{100 * (i + 1) / SearchDataAmnt:.2f}% : {i + 1} / {SearchDataAmnt}]" + " " * 15, end="\r")
             try:
-                chdir(f"{BasePath}\\{entry.path}")
+                chdir(path.join(BasePath, entry.path))
                 FileHash = GetFileHash(entry.filename)
                 if FileHash not in entries:
                     entries[FileHash] = []
-                entries[FileHash].append(f"{entry.path}\\{entry.filename}")
+                entries[FileHash].append(path.join(entry.path, entry.filename))
             except PermissionError:
                 """
                 Catches errors caused by files not being readable by the current user / python
                 """
                 pass
+        print()
         chdir(BasePath)
         return entries
 
@@ -159,23 +167,29 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
         
         chdir(ReferencePath)
 
-        CurrentFiles = [ i.split(".")[0] for i in glob(f"*{ext}") ]
+        CurrentFiles = [ i.split(".")[0] for i in glob(f"*{ext}") ] # Set of the files in the backup drives backup directory
         CurrentFiles = set(CurrentFiles)
         DirectoryFiles = set(TreeDict) # Gets `set()` type object of all the keys in TreeDict
-        AddFiles = CurrentFiles & DirectoryFiles
+        AddFiles = list(DirectoryFiles - CurrentFiles) # Gets list of all the files from the file that need to be added and removes the files that allready exist
         DeletionFiles = CurrentFiles - DirectoryFiles
 
         for file in DeletionFiles:
             # Deletes all the Files that exist in the CurrentFiles `set()` but not in the new dict
-            rm(file)
+            try: rm(file)
+            except: pass
 
-        for file in TreeDict:
+        AddFileAmnt = len(AddFiles) # The total amount of files to add
+
+        for i in range(AddFileAmnt):
+            file = AddFiles[i]
+            print(f" - File Copy : [{100 * (i + 1) / AddFileAmnt:.2f}% : {i + 1} / {AddFileAmnt}]" + " " * 15, end="\r")
             try:
                 Source = TreeDict[file][0]
                 Destination = file + ext
-                cp(f"{BasePath}\\{Source}", Destination)
+                cp(path.join(BasePath, Source), Destination)
             except Exception as e:
                 print(f"\nError: {e}")
+        print()
 
         with open(OutFileName + ext, "w") as f:
             f.write(json.dumps(TreeDict, sort_keys = True))
@@ -203,18 +217,20 @@ def regen88(ReferencePath: str = None):
     from os import getcwd
     from os import mkdir, chdir
 
-    def RecursFolderGen(path):
+    def RecursFolderGen(CurrentPath):
         """Generates Folder Recursively
         """
 
-        if isinstance(path, str):
-            path = [ BaseFolder, *path.split("\\")[:-1] ]
-        try: mkdir(path[0])
+        if isinstance(CurrentPath, str):
+            CurrentPath = path.normpath(CurrentPath) # Normalizes the path to the OSs perfered seperator
+            CurrentPath = [ BaseFolder, *CurrentPath.split(PathSep) ][:-1] # Then splits it into sections based on that seperator
+
+        try: mkdir(CurrentPath[0])
         except FileExistsError: pass
-        except FileNotFoundError: return RecursFolderGen(path[1::])
+        except FileNotFoundError: return RecursFolderGen(CurrentPath[1::])
         except IndexError: return
-        chdir(path[0])
-        RecursFolderGen(path[1::])
+        chdir(CurrentPath[0])
+        RecursFolderGen(CurrentPath[1::])
         return True
 
     if ReferencePath: chdir(ReferencePath)
@@ -232,7 +248,7 @@ def regen88(ReferencePath: str = None):
         for file in data[key]:
             RecursFolderGen(file)
             chdir(BaseBase)
-            cp(key + ext, f"{BaseFolder}\\{file}")
+            cp(key + ext, path.join(BaseFolder, file)) # Copies Files and uses some goofy syntax to remove the folder ending
 
     print("Finished Restore")
 
