@@ -35,16 +35,15 @@ def FindWaitTime():
 	from datetime import time, date, timedelta, datetime
 
 	GoodWeekdays = {2, 4} # 2 is Wednesday and 4 is Friday
-	SendTime = time(hour = 1, minute = 31, second = 59, microsecond = 0)
+	SendTime = time(hour = 12 + 9, minute = 30, second = 0, microsecond = 0)
 
-	DaySearch = date.today() + timedelta(days = 1) # Gets a date object with todays date informatino
-	while DaySearch.weekday() not in GoodWeekdays:
+	DaySearch = date.today() # Gets a date object with todays date informatino
+	while (DaySearch.weekday() not in GoodWeekdays) or (datetime.now().timestamp() > datetime.combine(DaySearch, SendTime).timestamp()):
 		# Itterates through weekdays until the weekday that it finds is acceptable
 		DaySearch += timedelta(days = 1)
 	return datetime.combine(DaySearch, SendTime).timestamp() - datetime.now().timestamp()
 
 notification = ToastNotifier()
-SendNotification()
 while 1:
 	SleepTime = FindWaitTime()
 	sleep(SleepTime)

@@ -95,7 +95,7 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
                 chdir(dir[-1])
             subfolders = set()
             NewFiles = []
-            for subfolder in glob("*/"):
+            for subfolder in glob("*/") + glob(".*/"):
                 try:
                     LocalSubfolder = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+(?=\\)" , subfolder)[0]
                     NewFiles = [*NewFiles, *DirectoryCarve(dir = [*dir, LocalSubfolder])]
