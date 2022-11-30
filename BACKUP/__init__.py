@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Author : Mark Tobin
+Author : #########
 Date   : Sept 21 2022
 
 Backs up Files with the *.88 format
