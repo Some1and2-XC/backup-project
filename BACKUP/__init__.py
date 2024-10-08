@@ -21,13 +21,34 @@ def StoreSearch88():
     Reference: https://stackoverflow.com/a/61168723
     """
 
-    from wmi import WMI
-    from os import chdir
+    # from wmi import WMI
+    from os import chdir, listdir, sep
     from glob import glob
     from re import findall as match
 
+    is_linux = False
+
+    try:
+        # Tries to set the drives to be the windows drives
+        drives = WMI().Win32_LogicalDisk()
+    except:
+        is_linux = True
+        # Assumes that everything is running on linux
+
+        # Defines DriveStub class so that this plays nice with
+        # the rest of the code
+        class DriveStub:
+            def __init__(self, drive_name: str): self.Caption = drive_name
+            def __repr__(self): return f"DriveStub object: `{self.Caption}`"
+
+        print("Assuming you're system is running linux...")
+        usr_name = input("What is your linux username (this is to find mounted drives): ")
+        drive_dir = f"/media/{usr_name}"
+
+        drives = [DriveStub(sep.join([drive_dir, dir])) for dir in listdir(drive_dir)]
+
     FoundPaths = {}
-    for drive in WMI().Win32_LogicalDisk():
+    for drive in drives:
         chdir(drive.Caption)
         directory = glob("*.88")
         if "@reference.88" in directory:
@@ -97,7 +118,13 @@ def create88(SourcePath: str = None, ReferencePath: str = None):
             NewFiles = []
             for subfolder in glob("*/") + glob(".*/"):
                 try:
-                    LocalSubfolder = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+(?=\\)" , subfolder)[0]
+                    RegexOutput = findall(r"[a-zA-Z0-9_.&#$@!%^&*’ \'\"\-\\\,\{\}\+\(\)\-\[\]]+" , subfolder)
+
+                    if len(RegexOutput) == 0:
+                        print(f"Regex Output has no length: {RegexOutput} from {subfolder}")
+                        continue
+
+                    LocalSubfolder = RegexOutput[0]
                     NewFiles = [*NewFiles, *DirectoryCarve(dir = [*dir, LocalSubfolder])]
                     subfolders.add(LocalSubfolder)
                 except Exception as e:
